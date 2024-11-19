@@ -101,10 +101,10 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
     }
 
     /// hashes nodex-i ...
-    pub fn add_node(&mut self, node: &str) -> Result<(Vec<(String, u64)>, Vec<Transaction>), &str> {
+    pub fn add_node(&mut self, node: &str) -> Result<(Vec<(String, u64)>, Vec<Transaction>), ConsistentHashingError> {
 
         if self.nodes.contains(node) {
-            return Err("Node already exists");
+            return Err(ConsistentHashingError::NodeAlreadyExists("This node already exist".to_string()));
         }
 
         let mut hashes = vec![];
@@ -166,10 +166,10 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
         return Ok((hashes, transactions));
     }
 
-    pub fn remove_node(&mut self, node: &str) -> Result<Vec<Transaction>, &str> {
+    pub fn remove_node(&mut self, node: &str) -> Result<Vec<Transaction>, ConsistentHashingError> {
 
         if !self.nodes.contains(node) {
-            return Err("Node does not exist");
+            return Err(ConsistentHashingError::NodeDoesNotExist("This node doesn't exist".to_string()));
         }
 
         let mut seen_v_node = HashSet::new();
