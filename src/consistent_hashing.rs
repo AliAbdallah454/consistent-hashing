@@ -1,4 +1,4 @@
-use std::{collections::{BTreeMap, HashSet}, hash::{Hash, Hasher}};
+use std::{collections::{BTreeMap, HashSet}, fmt, hash::{Hash, Hasher}};
 
 use crate::transaction::Transaction;
 
@@ -8,6 +8,28 @@ pub struct ConsistentHashing<T: Hasher + Default> {
     virtual_nodes_count: u32,
     _hasher: T,
 }
+
+#[derive(Debug)]
+pub enum ConsistentHashingError {
+    NodeAlreadyExists(String),
+    NodeDoesNotExist(String),
+    RingIsEmpty(String),
+    ZeroVirtualNodes(String),
+    UnchangedVirtualNodeCount(String)
+}
+
+// Implement the `std::fmt::Display` trait for user-friendly error messages
+// impl fmt::Display for ConsistentHashingError {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         match self {
+//             ConsistentHashingError::NodeAlreadyExists(msg) => write!(f, "Connection error: {}", msg),
+//             ConsistentHashingError::QueryError(msg) => write!(f, "Query error: {}", msg),
+//             ConsistentHashingError::NotFound(msg) => write!(f, "Not found: {}", msg),
+//         }
+//     }
+// }
+
+// impl std::error::Error for ConsistentHashingError {}
 
 impl<T: Hasher + Default> ConsistentHashing<T> {
     
@@ -23,13 +45,22 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
     pub fn new_with_nodes(virtual_nodes_count: u32, nodes: Vec<String>) -> Self {
         let mut consistent_hashing = ConsistentHashing::new(virtual_nodes_count);
         for node in nodes {
-            consistent_hashing.add_node(&node);
+            match consistent_hashing.add_node(&node) {
+                Ok(_) => (),
+                Err(_) => panic!("Node already exists")
+            };
         }
         return consistent_hashing;
     }
 
     fn get_virtual_node_form(&self, node: &str, i: u32) -> String {
-        return format!("{}-{}", i, node);
+        return format!("{}-{}", node, i);
+    }
+
+    fn get_current_state(&self) -> Vec<(u64, String)> {
+        let mut x: Vec<(u64, String)> = self.ring.iter().map(|(k, v)| (*k, v.clone())).collect();
+        x.sort_by(|a, b| a.0.cmp(&b.0));
+        return x;
     }
 
     fn hash<U: Hash>(&self, item: &U) -> u64 {
@@ -39,6 +70,7 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
     }
 
     fn get_previous_node(&self, node: &str) -> Option<(&u64, &String)> {
+        
         let hashed_value = self.hash(&node.to_string());
         if let Some(prev) = self.ring.range(..hashed_value).next_back() {
             return Some(prev);
@@ -69,7 +101,11 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
     }
 
     /// hashes nodex-i ...
-    pub fn add_node(&mut self, node: &str) -> (Vec<(String, u64)>, Vec<Transaction>) {
+    pub fn add_node(&mut self, node: &str) -> Result<(Vec<(String, u64)>, Vec<Transaction>), &str> {
+
+        if self.nodes.contains(node) {
+            return Err("Node already exists");
+        }
 
         let mut hashes = vec![];
         let mut transactions = vec![];
@@ -127,10 +163,14 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
 
         }
 
-        return (hashes, transactions);
+        return Ok((hashes, transactions));
     }
 
-    pub fn remove_node(&mut self, node: &str) -> Vec<Transaction> {
+    pub fn remove_node(&mut self, node: &str) -> Result<Vec<Transaction>, &str> {
+
+        if !self.nodes.contains(node) {
+            return Err("Node does not exist");
+        }
 
         let mut seen_v_node = HashSet::new();
         let mut transactions = vec![];
@@ -181,40 +221,52 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
             let hash = self.hash(&v_node);
             self.ring.remove(&hash);
         }
-        return transactions;
+        return Ok(transactions);
     }
 
-    pub fn set_virtual_nodes_count(&mut self, count: u32) -> Vec<Transaction> {
+    pub fn set_virtual_nodes_count(&mut self, count: u32) -> Result<Vec<Transaction>, ConsistentHashingError> {
         
-        let mut transactions = vec![];
-
-        if count == self.virtual_nodes_count {
-            return vec![];
+        if count == 0 {
+            return Err(ConsistentHashingError::ZeroVirtualNodes("Cannot set virtual nodes count to 0".to_string()));
         }
 
+        if count == self.virtual_nodes_count {
+            return Err(ConsistentHashingError::UnchangedVirtualNodeCount("New virtual nodes count is same as current".to_string()));
+        }
+
+        let mut transactions = vec![];
         let diff: i32 = count as i32 - self.virtual_nodes_count as i32;
 
         if diff > 0 {
             // add nodes
             for node in &self.nodes {
                 for i in self.virtual_nodes_count..count {
+
                     let v_node = self.get_virtual_node_form(node, i);
+                    println!("adding v_node: {}", v_node);
                     let hash = self.hash(&v_node);
+
                     self.ring.insert(hash, node.to_string());
                     let prev = self.get_previous_node_by_hash(hash).unwrap();
                     let next = self.get_next_node_by_hash(hash).unwrap();
 
-                    if next.1 == node {
-                        continue;
+                    if next.1 != node {
+                        let transaction = Transaction::new(
+                            next.1.to_string(),
+                            node.to_string(),
+                            *prev.0,
+                            hash
+                        );
+                        println!("{} with hash: {}", v_node, hash);
+                        println!("trans {:?}", transaction);
+                        transactions.push(transaction);
                     }
 
-                    let transaction = Transaction::new(
-                        next.1.to_string(),
-                        node.to_string(),
-                        *prev.0,
-                        hash
-                    );
-                    transactions.push(transaction);
+
+                    let x = self.get_current_state();
+                    for pair in x {
+                        println!("{}: {}", pair.1, pair.0);
+                    }
                 }
             }
         }
@@ -222,32 +274,43 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
             // remove nodes
             for node in &self.nodes {
                 for i in (count..self.virtual_nodes_count).rev() {
+                    
+                    let x = self.get_current_state();
+                    for pair in x {
+                        println!("{}: {}", pair.1, pair.0);
+                    }
+                    
                     let v_node = self.get_virtual_node_form(node, i);
                     let hash = self.hash(&v_node);
-                    self.ring.remove(&hash);
+
                     let prev = self.get_previous_node_by_hash(hash).unwrap();
                     let next = self.get_next_node_by_hash(hash).unwrap();
 
-                    if next.1 == node {
-                        continue;
+                    if next.1 != node {
+                        let transaction = Transaction::new(
+                            node.to_string(), 
+                            next.1.to_string(),
+                            *prev.0,
+                            hash
+                        );
+                        println!("{} with hash: {}", v_node, hash);
+                        println!("trans {:?}", transaction);
+                        transactions.push(transaction);
                     }
 
-                    let transaction = Transaction::new(
-                        node.to_string(),
-                        next.1.to_string(),
-                        *prev.0,
-                        hash
-                    );
-                    transactions.push(transaction);
-
+                    self.ring.remove(&hash);
                 }
             }
         }
+
         self.virtual_nodes_count = count;
-        return transactions;
+        return Ok(transactions);
     }
 
     pub fn get_node<U: Hash>(&self, key: &U) -> Option<&String> {
+        if self.ring.is_empty() {
+            return None;
+        }
         let hash = self.hash(key);
         println!("key hash: {}", hash);
         let node = self.ring

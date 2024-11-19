@@ -11,19 +11,18 @@ fn main() {
 
     println!("Inserting");
     let begin = Instant::now();
-    for i in 0..10 {
-        for pair in cons.add_node(&format!("node{}", i)).0 {
-            nodes.push(pair);
+    for i in 0..6 {
+
+        if let Ok((item, _)) = cons.add_node(&format!("node{}", i)) {
+            for pair in item {
+                nodes.push(pair);
+            }
         }
+
     }
     println!("Done in {:?}", begin.elapsed());
 
-    nodes.sort_by(|a, b| a.1.cmp(&b.1));
-    for x in &nodes {
-        println!("{} - {}", x.0, x.1);
-    }
-
-    let trans = cons.set_virtual_nodes_count(1);
+    let trans = cons.set_virtual_nodes_count(3).unwrap();
     for t in trans {
         println!("{:?}", t);
     }
