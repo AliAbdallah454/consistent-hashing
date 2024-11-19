@@ -15,11 +15,6 @@ impl Hasher for IdentityHasher {
     fn write(&mut self, bytes: &[u8]) {
         if let Ok(s) = std::str::from_utf8(bytes) {
             self.hash = s.parse::<u64>().expect("This should never fail");
-            // self.hash = s.chars()
-            //     .enumerate()
-            //     .fold(0u64, |acc, (i, c)| {
-            //         acc.wrapping_add((c as u64).wrapping_mul(31u64.pow(i as u32)))
-            //     });
         }
     }
 
@@ -35,7 +30,7 @@ impl Default for IdentityHasher {
 }
 
 #[derive(Debug, Clone)]
-struct IdentityHasherBuilder;
+struct IdentityHasherBuilder;   
 
 impl BuildHasher for IdentityHasherBuilder {
     type Hasher = IdentityHasher;

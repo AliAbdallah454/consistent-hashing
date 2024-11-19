@@ -1,4 +1,4 @@
-use std::{collections::{BTreeMap, HashSet}, hash::{DefaultHasher, Hash, Hasher}};
+use std::{collections::{BTreeMap, HashSet}, hash::{Hash, Hasher}};
 
 use crate::transaction::Transaction;
 
@@ -18,6 +18,14 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
             virtual_nodes_count,
             _hasher: T::default(),
         };
+    }
+
+    pub fn new_with_nodes(virtual_nodes_count: u32, nodes: Vec<String>) -> Self {
+        let mut consistent_hashing = ConsistentHashing::new(virtual_nodes_count);
+        for node in nodes {
+            consistent_hashing.add_node(&node);
+        }
+        return consistent_hashing;
     }
 
     fn get_virtual_node_form(&self, node: &str, i: u32) -> String {
@@ -65,12 +73,11 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
 
         let mut hashes = vec![];
         let mut transactions = vec![];
-
         self.nodes.insert(node.to_string());
+
         for i in 0..self.virtual_nodes_count {
             let v_node = self.get_virtual_node_form(node, i);
             let hash = self.hash(&v_node);
-            // println!("{} -> {}", v_node, hash);
             self.ring.insert(hash, node.to_string());
             hashes.push((format!("{}-{}", node, i), hash));
         }
@@ -78,8 +85,12 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
         let mut seen_v_node = HashSet::new();
 
         for i in 0..self.virtual_nodes_count {
-            let v_node = self.get_virtual_node_form(node, i);
+            
+            if self.nodes.len() < 2 {
+                break;
+            }
 
+            let v_node = self.get_virtual_node_form(node, i);
             let hash = self.hash(&v_node);
 
             if seen_v_node.contains(&hash) {
@@ -88,18 +99,8 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
 
             seen_v_node.insert(hash);
 
-            let mut prev_node = match self.get_previous_node(&v_node) {
-                Some(node) => node,
-                _ => (&0, &"".to_string()),
-            };
-            let mut next_node = match self.get_next_node(&v_node) {
-                Some(node) => node,
-                None => (&0, &"".to_string()),
-            };
-
-            if self.nodes.len() < 2 {
-                continue;
-            }
+            let mut prev_node = self.get_previous_node(&v_node).expect("This should never fail. If it failed, check condition for nodes.len() > 2");
+            let mut next_node = self.get_next_node(&v_node).expect("This should never fail. If it failed, check condition for nodes.len() > 2");
 
             while prev_node.1 == node {
                 let new_hash = *prev_node.0;
@@ -124,7 +125,6 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
             );
             transactions.push(new_transaction);
 
-            // println!("keys in range {} -> {} should be moved from {} -> {}", prev_node.0, final_virtual_node.0, next_node.1, node);
         }
 
         return (hashes, transactions);
@@ -135,7 +135,6 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
         let mut seen_v_node = HashSet::new();
         let mut transactions = vec![];
         self.nodes.remove(node);
-
 
         for i in 0..self.virtual_nodes_count {
             
@@ -148,21 +147,8 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
 
             seen_v_node.insert(hash);
 
-            let mut prev_node = match self.get_previous_node_by_hash(hash) {
-                Some(node) => node,
-                _ => {
-                    println!("ERRRRR");
-                    (&0, &"".to_string())
-                }
-            };
-            
-            let mut next_node = match self.get_next_node_by_hash(hash) {
-                Some(node) => node,
-                _ => {
-                    println!("ERRRRR");
-                    (&0, &"".to_string())
-                }
-            };
+            let mut prev_node = self.get_previous_node(&v_node).expect("This should never fail. If it failed, check condition for nodes.len() > 2");
+            let mut next_node = self.get_next_node(&v_node).expect("This should never fail. If it failed, check condition for nodes.len() > 2");
 
             while prev_node.1 == node {
                 let new_hash = *prev_node.0;
@@ -187,7 +173,6 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
             );
 
             transactions.push(new_transaction);
-            // println!("keys in range {} -> {} should be moved from {} -> {}", prev_node.0, final_virtual_node.0, node, next_node.1);
 
         }
 
