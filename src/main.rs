@@ -1,6 +1,6 @@
 use std::{collections::{BTreeMap, HashSet}, hash::{DefaultHasher, Hash, Hasher}};
 
-use my_consistent_hashing::transaction::Transaction;
+use my_consistent_hashing::transaction::{self, Transaction};
 
 struct ConsistentHashing<T: Hasher + Default> {
     ring: BTreeMap<u64, String>,
@@ -130,10 +130,13 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
         return (hashes, transactions);
     }
 
-    fn remove_node(&mut self, node: &str) {
+    fn remove_node(&mut self, node: &str) -> Vec<Transaction> {
 
         let mut seen_v_node = HashSet::new();
+        let mut transactions = vec![];
         self.nodes.remove(node);
+
+
         for i in 0..self.virtual_nodes_count {
             
             let v_node = self.get_virtual_node_form(node, i);
@@ -176,6 +179,14 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
             let new_hash = *next_node.0;
             let final_virtual_node = self.get_previous_node_by_hash(new_hash).unwrap();
 
+            let new_transaction = Transaction::new(
+                node.to_string(),
+                next_node.1.to_string(),
+                *prev_node.0,
+                *final_virtual_node.0
+            );
+
+            transactions.push(new_transaction);
             println!("keys in range {} -> {} should be moved from {} -> {}", prev_node.0, final_virtual_node.0, node, next_node.1);
 
         }
@@ -185,42 +196,62 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
             let hash = self.hash(&v_node);
             self.ring.remove(&hash);
         }
-
+        return transactions;
     }
 
     fn get_node<U: Hash>(&self, key: &U) -> Option<&String> {
         let hash = self.hash(key);
         println!("key hash: {}", hash);
-        self.ring
+        let node = self.ring
             .range(hash..)
             .next()
-            .or_else(|| self.ring.iter().next())
-            .map(|(_, node)| node)
+            .or_else(|| self.ring.iter().next());
+        return Some(node.unwrap().1);
+            
     }
 
 }
 
 fn main() {
 
-    let mut cons = ConsistentHashing::<DefaultHasher>::new(2);
+    let mut map = BTreeMap::new();
 
-    let mut nodes = vec![];
+    map.insert(10, 4);
+    map.insert(20, 4);
+    map.insert(1, 4);
+    map.insert(9, 4);
+    map.insert(2, 4);
 
-    for i in 0..6 {
-        for pair in cons.add_node(&format!("node{}", i)).0 {
-            nodes.push(pair);
-        }
-    }
+    println!("{:?}", map.iter());
 
-    nodes.sort_by(|a, b| a.1.cmp(&b.1));
-    for x in &nodes {
-        println!("{} - {}", x.0, x.1);
-    }
+    // let mut cons = ConsistentHashing::<DefaultHasher>::new(2);
 
-    cons.remove_node("node3");
+    // let mut nodes = vec![];
 
-    cons.add_node("node10");
+    // for i in 0..6 {
+    //     for pair in cons.add_node(&format!("node{}", i)).0 {
+    //         nodes.push(pair);
+    //     }
+    // }
 
-    println!("{:?}", cons.nodes);
+    // nodes.sort_by(|a, b| a.1.cmp(&b.1));
+    // for x in &nodes {
+    //     println!("{} - {}", x.0, x.1);
+    // }
+
+    // let trans = cons.remove_node("node3");
+
+    // for t in trans {
+    //     println!("{:?}", t);
+    // }
+    // println!("{:?}", cons.get_node(&"keyxy".to_string()));
+
+
+    // let (_, trans) = cons.add_node("node10");
+    
+    // for t in trans {
+    //     println!("{:?}", t);
+    // }
+    // println!("{:?}", cons.nodes);
 
 }
