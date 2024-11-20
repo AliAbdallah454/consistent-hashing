@@ -9,7 +9,7 @@ fn main() {
 
     let begin = Instant::now();
     for i in 0..10_000 {
-        cons.add_node(&format!("node{}", i));
+        cons.add_node_faster(&format!("node{}", i)).unwrap();
         // if let Ok(item) = cons.add_node(&format!("node{}", i)) {
             // for tran in item {
             //     println!("Trans : {:?}", tran);

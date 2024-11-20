@@ -1,12 +1,12 @@
-use std::{collections::{BTreeMap, HashSet}, fmt, hash::{Hash, Hasher}};
+use std::{collections::{BTreeMap, HashSet}, hash::{Hash, Hasher}};
 
 use crate::transaction::Transaction;
 
 pub struct ConsistentHashing<T: Hasher + Default> {
-    ring: BTreeMap<u64, String>,
+    pub ring: BTreeMap<u64, String>,
     pub nodes: HashSet<String>,
-    virtual_nodes_count: u32,
-    _hasher: T,
+    pub virtual_nodes_count: u32,
+    pub _hasher: T,
 }
 
 #[derive(Debug)]
@@ -40,25 +40,23 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
         return consistent_hashing;
     }
 
-    fn get_virtual_node_form(&self, node: &str, i: u32) -> String {
+    pub fn get_virtual_node_form(&self, node: &str, i: u32) -> String {
         return format!("{}-{}", node, i);
     }
 
-    pub fn get_current_state(&self) {
+    pub fn get_current_state(&self) -> Vec<(u64, String)> {
         let mut x: Vec<(u64, String)> = self.ring.iter().map(|(k, v)| (*k, v.clone())).collect();
         x.sort_by(|a, b| a.0.cmp(&b.0));
-        for (hash, name) in x {
-            println!("{}: {}", name, hash);
-        }
+        return x;
     }
 
-    fn hash<U: Hash>(&self, item: &U) -> u64 {
+    pub fn hash<U: Hash>(&self, item: &U) -> u64 {
         let mut hasher = T::default();
         item.hash(&mut hasher);
         return hasher.finish();
     }
 
-    fn get_previous_node(&self, node: &str) -> Option<(&u64, &String)> {
+    pub fn get_previous_node(&self, node: &str) -> Option<(&u64, &String)> {
         
         let hashed_value = self.hash(&node.to_string());
         if let Some(prev) = self.ring.range(..hashed_value).next_back() {
@@ -67,14 +65,14 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
         return self.ring.iter().next_back().clone();
     }
 
-    fn get_previous_node_by_hash(&self, hash: u64) -> Option<(&u64, &String)> {
+    pub fn get_previous_node_by_hash(&self, hash: u64) -> Option<(&u64, &String)> {
         if let Some(prev) = self.ring.range(..hash).next_back() {
             return Some(prev);
         }
         return self.ring.iter().next_back().clone();
     }
 
-    fn get_next_node(&self, node: &str) -> Option<(&u64, &String)> {
+    pub fn get_next_node(&self, node: &str) -> Option<(&u64, &String)> {
         let hashed_value = self.hash(&node.to_string());
         if let Some(prev) = self.ring.range(hashed_value..).skip(1).next() {
             return Some(prev);
@@ -82,7 +80,7 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
         return self.ring.iter().next().clone();
     }
 
-    fn get_next_node_by_hash(&self, hash: u64) -> Option<(&u64, &String)> {
+    pub fn get_next_node_by_hash(&self, hash: u64) -> Option<(&u64, &String)> {
         if let Some(prev) = self.ring.range(hash..).skip(1).next() {
             return Some(prev);
         }
@@ -132,7 +130,7 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
                 seen_v_node.insert(new_hash);
                 prev_node = self.get_previous_node_by_hash(new_hash).unwrap();
             }
-
+            
             if next_node.1 == node {
                 let new_hash = *next_node.0;
                 seen_v_node.insert(new_hash);
@@ -253,7 +251,10 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
                     }
 
 
-                    self.get_current_state();
+                    let state = self.get_current_state();
+                    for (h, n) in state {
+                        println!("{}: {}", n, h);
+                    }
                 }
             }
         }
@@ -262,7 +263,10 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
             for node in &self.nodes {
                 for i in (count..self.virtual_nodes_count).rev() {
                     
-                    self.get_current_state();
+                    let state = self.get_current_state();
+                    for (h, n) in state {
+                        println!("{}: {}", n, h);
+                    }
                     
                     let v_node = self.get_virtual_node_form(node, i);
                     let hash = self.hash(&v_node);

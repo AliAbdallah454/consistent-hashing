@@ -1,9 +1,9 @@
 #[derive(Debug, Clone)]
 pub struct Transaction {
-    source: String,
-    destination: String,
-    begining: u64,
-    ending: u64,
+    pub source: String,
+    pub destination: String,
+    pub begining: u64,
+    pub ending: u64,
 }
 
 impl Transaction {
