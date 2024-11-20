@@ -44,10 +44,12 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
         return format!("{}-{}", node, i);
     }
 
-    fn get_current_state(&self) -> Vec<(u64, String)> {
+    pub fn get_current_state(&self) {
         let mut x: Vec<(u64, String)> = self.ring.iter().map(|(k, v)| (*k, v.clone())).collect();
         x.sort_by(|a, b| a.0.cmp(&b.0));
-        return x;
+        for (hash, name) in x {
+            println!("{}: {}", name, hash);
+        }
     }
 
     fn hash<U: Hash>(&self, item: &U) -> u64 {
@@ -89,12 +91,15 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
 
     /// hashes nodex-i ...
     pub fn add_node(&mut self, node: &str) -> Result<Vec<Transaction>, ConsistentHashingError> {
-
         if self.nodes.contains(node) {
             return Err(ConsistentHashingError::NodeAlreadyExists("This node already exist".to_string()));
         }
 
-        let mut hashes = vec![];
+        if self.virtual_nodes_count == 0 {
+            return Err(ConsistentHashingError::ZeroVirtualNodes("Cannot add node with zero virtual nodes".to_string()));
+        }    
+
+        let mut hashes = Vec::with_capacity(self.virtual_nodes_count as usize);
         let mut transactions = vec![];
         self.nodes.insert(node.to_string());
 
@@ -102,28 +107,25 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
             let v_node = self.get_virtual_node_form(node, i);
             let hash = self.hash(&v_node);
             self.ring.insert(hash, node.to_string());
-            hashes.push((format!("{}-{}", node, i), hash));
+            hashes.push(hash);
         }
 
         if self.nodes.len() < 2 {
             return Ok(transactions);
         }
 
-        let mut seen_v_node = HashSet::new();
+        let mut seen_v_node = HashSet::with_capacity(self.virtual_nodes_count as usize);
 
         for i in 0..self.virtual_nodes_count {
 
-            let v_node = self.get_virtual_node_form(node, i);
-            let hash = self.hash(&v_node);
+            let hash = hashes[i as usize];
 
-            if seen_v_node.contains(&hash) {
+            if !seen_v_node.insert(hash) {
                 continue;
             }
 
-            seen_v_node.insert(hash);
-
-            let mut prev_node = self.get_previous_node(&v_node).expect("This should never fail. If it failed, check condition for nodes.len() > 2");
-            let mut next_node = self.get_next_node(&v_node).expect("This should never fail. If it failed, check condition for nodes.len() > 2");
+            let mut prev_node = self.get_previous_node_by_hash(hash).expect("This should never fail. If it failed, check condition for nodes.len() > 2");
+            let mut next_node = self.get_next_node_by_hash(hash).expect("This should never fail. If it failed, check condition for nodes.len() > 2");
 
             while prev_node.1 == node {
                 let new_hash = *prev_node.0;
@@ -154,25 +156,27 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
     }
 
     pub fn remove_node(&mut self, node: &str) -> Result<Vec<Transaction>, ConsistentHashingError> {
-
         if !self.nodes.contains(node) {
             return Err(ConsistentHashingError::NodeDoesNotExist("This node doesn't exist".to_string()));
         }
 
-        let mut seen_v_node = HashSet::new();
+        // HashSet::with ... is not tested
+        let mut seen_v_node = HashSet::with_capacity(self.virtual_nodes_count as usize);
+        let mut hashes = Vec::with_capacity(self.virtual_nodes_count as usize);
         let mut transactions = vec![];
         self.nodes.remove(node);
+
+        println!("removing: {}", node);
 
         for i in 0..self.virtual_nodes_count {
             
             let v_node = self.get_virtual_node_form(node, i);
             let hash = self.hash(&v_node);
+            hashes.push(hash);
 
-            if seen_v_node.contains(&hash) {
+            if !seen_v_node.insert(hash) {
                 continue;
             }
-
-            seen_v_node.insert(hash);
 
             let mut prev_node = self.get_previous_node(&v_node).expect("This should never fail. If it failed, check condition for nodes.len() > 2");
             let mut next_node = self.get_next_node(&v_node).expect("This should never fail. If it failed, check condition for nodes.len() > 2");
@@ -204,8 +208,7 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
         }
 
         for i in 0..self.virtual_nodes_count {
-            let v_node = self.get_virtual_node_form(node, i);
-            let hash = self.hash(&v_node);
+            let hash = hashes[i as usize];
             self.ring.remove(&hash);
         }
         return Ok(transactions);
@@ -250,10 +253,7 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
                     }
 
 
-                    let x = self.get_current_state();
-                    for pair in x {
-                        println!("{}: {}", pair.1, pair.0);
-                    }
+                    self.get_current_state();
                 }
             }
         }
@@ -262,10 +262,7 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
             for node in &self.nodes {
                 for i in (count..self.virtual_nodes_count).rev() {
                     
-                    let x = self.get_current_state();
-                    for pair in x {
-                        println!("{}: {}", pair.1, pair.0);
-                    }
+                    self.get_current_state();
                     
                     let v_node = self.get_virtual_node_form(node, i);
                     let hash = self.hash(&v_node);
