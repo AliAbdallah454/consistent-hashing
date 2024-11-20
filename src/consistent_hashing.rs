@@ -18,19 +18,6 @@ pub enum ConsistentHashingError {
     UnchangedVirtualNodeCount(String)
 }
 
-// Implement the `std::fmt::Display` trait for user-friendly error messages
-// impl fmt::Display for ConsistentHashingError {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         match self {
-//             ConsistentHashingError::NodeAlreadyExists(msg) => write!(f, "Connection error: {}", msg),
-//             ConsistentHashingError::QueryError(msg) => write!(f, "Query error: {}", msg),
-//             ConsistentHashingError::NotFound(msg) => write!(f, "Not found: {}", msg),
-//         }
-//     }
-// }
-
-// impl std::error::Error for ConsistentHashingError {}
-
 impl<T: Hasher + Default> ConsistentHashing<T> {
     
     pub fn new(virtual_nodes_count: u32) -> Self {
@@ -101,7 +88,7 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
     }
 
     /// hashes nodex-i ...
-    pub fn add_node(&mut self, node: &str) -> Result<(Vec<(String, u64)>, Vec<Transaction>), ConsistentHashingError> {
+    pub fn add_node(&mut self, node: &str) -> Result<Vec<Transaction>, ConsistentHashingError> {
 
         if self.nodes.contains(node) {
             return Err(ConsistentHashingError::NodeAlreadyExists("This node already exist".to_string()));
@@ -118,13 +105,13 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
             hashes.push((format!("{}-{}", node, i), hash));
         }
 
+        if self.nodes.len() < 2 {
+            return Ok(transactions);
+        }
+
         let mut seen_v_node = HashSet::new();
 
         for i in 0..self.virtual_nodes_count {
-            
-            if self.nodes.len() < 2 {
-                break;
-            }
 
             let v_node = self.get_virtual_node_form(node, i);
             let hash = self.hash(&v_node);
@@ -163,7 +150,7 @@ impl<T: Hasher + Default> ConsistentHashing<T> {
 
         }
 
-        return Ok((hashes, transactions));
+        return Ok(transactions);
     }
 
     pub fn remove_node(&mut self, node: &str) -> Result<Vec<Transaction>, ConsistentHashingError> {
