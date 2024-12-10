@@ -1,5 +1,5 @@
 use std::time::Instant;
-use my_consistent_hashing::consistent_hashing::ConsistentHashing;
+use consistent_hashing_aa::consistent_hashing::ConsistentHashing;
 
 fn main() {
 

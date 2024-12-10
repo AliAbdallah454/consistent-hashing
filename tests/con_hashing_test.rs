@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
 
-    use my_consistent_hashing::consistent_hashing::ConsistentHashing;
+    use consistent_hashing_aa::consistent_hashing::ConsistentHashing;
 
      // Import functions from the outer module
 
