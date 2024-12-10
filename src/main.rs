@@ -1,22 +1,18 @@
-
-use std::{hash::DefaultHasher, time::Instant};
-
+use std::time::Instant;
 use my_consistent_hashing::consistent_hashing::ConsistentHashing;
 
 fn main() {
 
-    let mut cons = ConsistentHashing::<DefaultHasher>::new(100+1);
+    let mut cons = ConsistentHashing::new(2);
 
     let begin = Instant::now();
-    for i in 0..10_000 {
-        cons.add_node_faster(&format!("node{}", i)).unwrap();
-        // if let Ok(item) = cons.add_node(&format!("node{}", i)) {
-            // for tran in item {
-            //     println!("Trans : {:?}", tran);
-            // }
-        // }
-        // cons.get_current_state();
+    for i in 0..10 {
+        cons.add_node(&format!("node{}", i)).unwrap();
     }
     println!("Done in {:?}", begin.elapsed());
+    let (node, key_hash) = cons.get_node(&"gay".to_string());
+
+    println!("node: {}", node.unwrap());
+    println!("hash: {}", key_hash.unwrap());
 
 }

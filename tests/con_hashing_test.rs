@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use std::hash::DefaultHasher;
 
     use my_consistent_hashing::consistent_hashing::ConsistentHashing;
 
@@ -9,7 +8,7 @@ mod tests {
     #[test]
     fn test_add_node_1() {
 
-        let mut cons = ConsistentHashing::<DefaultHasher>::new(1);
+        let mut cons = ConsistentHashing::new(1);
 
         for i in 0..5 {
             let node = format!("node{}", i);
