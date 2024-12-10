@@ -2,6 +2,12 @@
 name = "my-consistent-hashing"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "A crate that implements the consistent hashing algorithm using BTreeMap"
+homepage = "https://github.com/AliAbdallah454/consistent-hashing.git"
+repository = "https://github.com/AliAbdallah454/consistent-hashing.git"
+readme = "README.md"
+keywords = ["distributed_system", "consistent_hashing"]
 
 [dependencies]
 rocket = { version = "0.5.1", features = ["json"] }
