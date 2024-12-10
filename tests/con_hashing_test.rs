@@ -3,7 +3,7 @@ mod tests {
 
     use my_consistent_hashing::consistent_hashing::ConsistentHashing;
 
-    use super::*; // Import functions from the outer module
+     // Import functions from the outer module
 
     #[test]
     fn test_add_node_1() {
