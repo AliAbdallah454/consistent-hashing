@@ -16,7 +16,7 @@ pub enum ConsistentHashingError {
     ZeroVirtualNodes(String),
     UnchangedVirtualNodeCount(String)
 }
-// Consistent Hashing
+// Consistent Hashingss
 impl ConsistentHashing {
     
     pub fn new(virtual_nodes_count: u32) -> Self {
