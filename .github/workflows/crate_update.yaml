@@ -1,4 +1,5 @@
 name: Crate update
+run-name: Updating consistent hashing crate
 
 on:
   push:
