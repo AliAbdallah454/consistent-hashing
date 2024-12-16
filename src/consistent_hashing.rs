@@ -100,7 +100,6 @@ impl ConsistentHashing {
         let mut transactions = Vec::with_capacity(self.virtual_nodes_count as usize);
         for i in 0..self.virtual_nodes_count {
             
-            // let hash = self.hash(&(node.to_string(), i));
             let v_node = self.get_virtual_node_form(node, i);
             let hash = self.hash(&v_node);
             self.ring.insert(hash, node.to_string());
@@ -125,55 +124,26 @@ impl ConsistentHashing {
             return Err(ConsistentHashingError::NodeDoesNotExist("This node doesn't exist".to_string()));
         }
 
-        // HashSet::with ... is not tested
-        let mut seen_v_node = HashSet::with_capacity(self.virtual_nodes_count as usize);
-        let mut hashes = Vec::with_capacity(self.virtual_nodes_count as usize);
         let mut transactions = vec![];
         self.nodes.remove(node);
 
         println!("removing: {}", node);
 
         for i in 0..self.virtual_nodes_count {
-            
             let v_node = self.get_virtual_node_form(node, i);
             let hash = self.hash(&v_node);
-            hashes.push(hash);
 
-            if !seen_v_node.insert(hash) {
-                continue;
+            let next = self.get_next_node_by_hash(hash).unwrap();
+            if next.1 != node {
+                let prev = self.get_previous_node_by_hash(hash).unwrap();
+                let new_transaction = Transaction::new(
+                    node.to_string(),
+                    next.1.to_string(),
+                    *prev.0,
+                    hash
+                );
+                transactions.push(new_transaction);
             }
-
-            let mut prev_node = self.get_previous_node(&v_node).expect("This should never fail. If it failed, check condition for nodes.len() > 2");
-            let mut next_node = self.get_next_node(&v_node).expect("This should never fail. If it failed, check condition for nodes.len() > 2");
-
-            while prev_node.1 == node {
-                let new_hash = *prev_node.0;
-                seen_v_node.insert(new_hash);
-                prev_node = self.get_previous_node_by_hash(new_hash).unwrap();
-            }
-
-            if next_node.1 == node {
-                let new_hash = *next_node.0;
-                seen_v_node.insert(new_hash);
-                next_node = self.get_next_node_by_hash(new_hash).unwrap();
-            }
-
-            let new_hash = *next_node.0;
-            let final_virtual_node = self.get_previous_node_by_hash(new_hash).unwrap();
-
-            let new_transaction = Transaction::new(
-                node.to_string(),
-                next_node.1.to_string(),
-                *prev_node.0,
-                *final_virtual_node.0
-            );
-
-            transactions.push(new_transaction);
-
-        }
-
-        for i in 0..self.virtual_nodes_count {
-            let hash = hashes[i as usize];
             self.ring.remove(&hash);
         }
         return Ok(transactions);
